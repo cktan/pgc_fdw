@@ -6688,14 +6688,14 @@ void cache_create_cursor(ForeignScanState *node)
 	qry_key_build(&fsstate->cache_qk, buf.data);
 
 	status = pgcache_get_status(&fsstate->cache_qk, ts, &to, buf.data);
-	CHECK_COND(status != QRY_FAIL, "failed to cache query %s", buf.data);
+	CHECK_COND(status != QRY_FAIL, "pgcache_get_status: failed to cache query %s", buf.data);
 
 	if (status >= 0) {
 		status = pgcache_retrieve(&fsstate->cache_qk, to, &fsstate->num_tuples, &fsstate->tuples);
 		if (status >= 0) {
 			fsstate->eof_reached = true;
 		}
-		CHECK_COND(status != QRY_FAIL, "failed to cache query %s", buf.data);
+		CHECK_COND(status != QRY_FAIL, "pgcache_retrieve: failed to cache query %s", buf.data);
 	}
 		
 	if (status == QRY_FETCH || status == QRY_FDB_LIMIT_REACHED) {
