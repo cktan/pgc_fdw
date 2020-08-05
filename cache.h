@@ -141,6 +141,7 @@ void pgcache_fini(void);
 int32_t pgcache_get_status(const qry_key_t* qk, int64_t ts, int64_t *to, const char *data); 
 int32_t pgcache_populate(const qry_key_t* qk, int64_t ts, int ntup, HeapTuple *tups); 
 int32_t pgcache_retrieve(const qry_key_t* qk, int64_t ts, int *ntup, HeapTuple **tups); 
+void pgcache_clear(const qry_key_t *qk);
 
 
 

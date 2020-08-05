@@ -6712,11 +6712,15 @@ void cache_create_cursor(ForeignScanState *node)
 		 * server has the same OIDs we do for the parameters' types.
 		 */
 		if (!PQsendQueryParams(conn, buf.data, numParams,
-					NULL, values, NULL, NULL, 0))
+					NULL, values, NULL, NULL, 0)) {
+
+			pgcache_clear(&fsstate->cache_qk);
 			pgfdw_report_error(ERROR, NULL, conn, false, buf.data);
+		}	
 
 		res = pgfdw_get_result(conn, buf.data);
 		if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+			pgcache_clear(&fsstate->cache_qk);
 			pgfdw_report_error(ERROR, res, conn, true, fsstate->query);
 		}
 		PQclear(res);
@@ -6726,6 +6730,7 @@ void cache_create_cursor(ForeignScanState *node)
 		{
 			res = pgfdw_exec_query(conn, sql);
 			if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+				pgcache_clear(&fsstate->cache_qk);
 				pgfdw_report_error(ERROR, res, conn, false, fsstate->query);
 			}
 

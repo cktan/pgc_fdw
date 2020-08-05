@@ -38,7 +38,7 @@ void pgcache_fini()
 	CHECK_ERR(fdb_stop_network(), "Cannot stop fdb network.");
 	CHECK_ERR(pthread_join(pth, NULL), "Cannot join fdb network thread");
 	fdb = 0;
-	fdw_inited = 0;
+	fdb_inited = 0;
 }
 
 int32_t pgcache_get_status(const qry_key_t *qk, int64_t ts, int64_t *to, const char* qstr) 
@@ -214,6 +214,34 @@ done:
 		tr = 0;
 	}
 	return ret;
+}
+
+void pgcache_clear(const qry_key_t *qk)
+{
+	FDBTransaction *tr = 0;
+	FDBFuture *f = 0;
+	fdb_error_t err = 0;
+
+	for (int i = 0 ; i < 10 ; i++) {
+		ERR_DONE( fdb_database_create_transaction(get_fdb(), &tr), "cannot begin fdb transaction");
+		fdb_transaction_clear(tr, (const uint8_t *) qk, sizeof(qry_key_t));
+        	f = fdb_transaction_commit(tr);
+        	err = fdb_wait_error(f);
+
+done:
+		if (f) {
+			fdb_future_destroy(f);
+			f = 0;
+		}
+
+		if (tr) {
+			fdb_transaction_destroy(tr);
+			tr = 0;
+		}
+		if (!err) {
+			break;
+		}	
+	}
 }
 
 int32_t pgcache_populate(const qry_key_t *qk, int64_t ts, int ntup, HeapTuple *tups)
