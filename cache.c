@@ -134,6 +134,8 @@ int32_t pgcache_retrieve(const qry_key_t *qk, int64_t ts, int *ntup, HeapTuple *
 	int kvcnt;
 	HeapTuple *tups = 0;
 
+	if (*ntup == 0) return 0;
+
 	ERR_DONE( fdb_database_create_transaction(get_fdb(), &tr), "cannot begin fdb transaction");
 	f = fdb_transaction_get(tr, (const uint8_t *) qk, sizeof(qry_key_t), 0); 
 	ERR_DONE( fdb_wait_error(f), "fdb future failed");
@@ -149,6 +151,7 @@ int32_t pgcache_retrieve(const qry_key_t *qk, int64_t ts, int *ntup, HeapTuple *
 	tup_key_initsha(&kz, qk->SHA, -1); 
 
 	fdb_future_destroy(f);
+
 	f = fdb_transaction_get_range(tr, 
 			(const uint8_t *)&ka, sizeof(tup_key_t), 0, 1,
 			(const uint8_t *)&kz, sizeof(tup_key_t), 0, 1,
@@ -163,12 +166,14 @@ int32_t pgcache_retrieve(const qry_key_t *qk, int64_t ts, int *ntup, HeapTuple *
 		 * tup_key_t *tk = (tup_key_t *) outkv[i].key;
 		 * elog(LOG, "Reading a key, seq %d, klen %d, vlen %d.", tk->seq, outkv[i].key_length, outkv[i].value_length); 
 		 */
+		
 		dst = (char *) palloc(outkv[i].value_length);
 		memcpy(dst, outkv[i].value, outkv[i].value_length);
 		tups[i] = (HeapTuple) dst;
 		/* FUBAR: unmarshaling */
 		tups[i]->t_data = (HeapTupleHeader) (dst + HEAPTUPLESIZE);
 	}
+
 	ret = *ntup;
 
 done:
