@@ -296,6 +296,7 @@ int32_t pgcache_populate(const qry_key_t *qk, int64_t ts, int ntup, HeapTuple *t
 		fdb_transaction_clear_range(tr, (const uint8_t *) &ka, sizeof(ka), 
 				(const uint8_t *) &kz, sizeof(kz));
 
+
 		/* Now put all tuples in */
 		for (int i = 0; i < ntup; i++) {
 			int vlen = HEAPTUPLESIZE + tups[i]->t_len;
@@ -306,7 +307,20 @@ int32_t pgcache_populate(const qry_key_t *qk, int64_t ts, int ntup, HeapTuple *t
 			/* elog(LOG, "Putting in a key, seq %d, vlen %d.", ka.seq, vlen); */
 
 			wszNb += sizeof(ka) + vlen;
-			wszEstNb += 3 * sizeof(ka) + vlen;
+			wszEstNb += 3 * sizeof(ka) + 2 * vlen; // fdb_transaction_get_approximate_size to check tx size
+	
+/*
+			if ((i % 100) == 0) {
+               			FDBFuture *apszf = fdb_transaction_get_approximate_size(tr);
+               			err = fdb_wait_error(apszf);
+				int64_t txsz = 0;
+				err = fdb_future_get_int64(apszf, &txsz);
+                		elog(LOG, "TXSZ = %ld, Size = %d, Est = %d", txsz, wszNb, wszEstNb);
+				fdb_future_destroy(apszf);
+				apszf = 0;
+			}
+*/
+
 			if (wszEstNb > wszLimit) {
 				ret = QRY_FDB_LIMIT_REACHED;
 				elog(LOG, "FoundattionDB TX limit reached after %d out of %d tuples.", i, ntup); 
