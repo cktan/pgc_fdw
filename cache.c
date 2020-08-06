@@ -152,7 +152,7 @@ int32_t pgcache_retrieve(const qry_key_t *qk, int64_t ts, int *ntup, HeapTuple *
 	f = fdb_transaction_get_range(tr, 
 			(const uint8_t *)&ka, sizeof(tup_key_t), 0, 1,
 			(const uint8_t *)&kz, sizeof(tup_key_t), 0, 1,
-			0, 0, FDB_STREAMING_MODE_WANT_ALL, 1, 0, 0);
+			*ntup, 0, FDB_STREAMING_MODE_EXACT, 1, 0, 0);
 	ERR_DONE( fdb_wait_error(f), "get range failed");
 	ERR_DONE( fdb_future_get_keyvalue_array(f, &outkv, &kvcnt, &found), "retrieve kv array failed.");
 	ERR_DONE( kvcnt != *ntup, "kvcount mismatch! get %d, expecting %d", kvcnt, *ntup);
@@ -260,6 +260,7 @@ int32_t pgcache_populate(const qry_key_t *qk, int64_t ts, int ntup, HeapTuple *t
 	tup_key_t kz;
 
 	int wszNb = 0;
+	int wszEstNb = 0;
 	/* FoundationDB funny transaction limit -- 10MB.  We cap it to 5MB */
 	const int wszLimit = 5000000; 
 
@@ -269,6 +270,7 @@ int32_t pgcache_populate(const qry_key_t *qk, int64_t ts, int ntup, HeapTuple *t
 
 	for (int i = 0; i < 10; i++) {
 		wszNb = 0;
+		wszEstNb = 0;
 
 		ERR_DONE( fdb_database_create_transaction(get_fdb(), &tr), "cannot begin fdb transaction");
 		f = fdb_transaction_get(tr, (const uint8_t *) qk, sizeof(qry_key_t), 0);
@@ -304,7 +306,8 @@ int32_t pgcache_populate(const qry_key_t *qk, int64_t ts, int ntup, HeapTuple *t
 			/* elog(LOG, "Putting in a key, seq %d, vlen %d.", ka.seq, vlen); */
 
 			wszNb += sizeof(ka) + vlen;
-			if (wszNb > wszLimit) {
+			wszEstNb += 3 * sizeof(ka) + vlen;
+			if (wszEstNb > wszLimit) {
 				ret = QRY_FDB_LIMIT_REACHED;
 				elog(LOG, "FoundattionDB TX limit reached after %d out of %d tuples.", i, ntup); 
 				goto done;
@@ -318,7 +321,7 @@ int32_t pgcache_populate(const qry_key_t *qk, int64_t ts, int ntup, HeapTuple *t
 
 		f = fdb_transaction_commit(tr);
 		err = fdb_wait_error(f);
-		ERR_DONE(err, "cache populate transaction error.");
+		ERR_DONE(err, "cache populate transaction error. nbyte = %d, Est = %d. reason = %s", wszNb, wszEstNb, fdb_get_error(err));
 		ret = ntup;
 
 done:
@@ -337,6 +340,7 @@ done:
 			break;
 		} 
 	}
+
 
 	while (ret == QRY_FDB_LIMIT_REACHED) {
 		qv->status = QRY_FDB_LIMIT_REACHED;
