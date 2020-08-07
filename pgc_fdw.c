@@ -6695,7 +6695,14 @@ void cache_create_cursor(ForeignScanState *node)
 		if (status >= 0) {
 			fsstate->eof_reached = true;
 		}
-		CHECK_COND(status != QRY_FAIL, "pgcache_retrieve: failed to cache query %s", buf.data);
+
+		/* TODO: if status == QRY_FAIL, shall clear up the cache and mark status = QRY_FETCH */
+		//CHECK_COND(status != QRY_FAIL, "pgcache_retrieve: failed to cache query %s", buf.data);
+		if (status == QRY_FAIL) {
+			pgcache_clear(&fsstate->cache_qk);
+			status = pgcache_get_status(&fsstate->cache_qk, ts, &to, buf.data);
+			CHECK_COND(status != QRY_FAIL, "pgcache_get_status: failed to cache query %s", buf.data);
+		}
 	}
 		
 	if (status == QRY_FETCH || status == QRY_FDB_LIMIT_REACHED) {
@@ -6761,7 +6768,11 @@ void cache_create_cursor(ForeignScanState *node)
 		 	 * we don't care about return status, if it fail, we will mark it in cache metadata
 		 	 * but the data we fectched this time is still good.
 		 	 */
-			pgcache_populate(&fsstate->cache_qk, to, fsstate->num_tuples, fsstate->tuples);
+			status = pgcache_populate(&fsstate->cache_qk, to, fsstate->num_tuples, fsstate->tuples);
+			// If QRY_FAIL, clear the cache
+			if (status == QRY_FAIL) {
+				pgcache_clear(&fsstate->cache_qk);
+			}
 		}
 	}
 

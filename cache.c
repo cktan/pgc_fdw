@@ -228,12 +228,23 @@ void pgcache_clear(const qry_key_t *qk)
 	FDBTransaction *tr = 0;
 	FDBFuture *f = 0;
 	fdb_error_t err = 0;
+	tup_key_t ka, kz;
+
+	tup_key_initsha(&ka, qk->SHA, 0);
+	tup_key_initsha(&kz, qk->SHA, -1);
 
 	for (int i = 0 ; i < 10 ; i++) {
 		ERR_DONE( fdb_database_create_transaction(get_fdb(), &tr), "cannot begin fdb transaction");
 		fdb_transaction_clear(tr, (const uint8_t *) qk, sizeof(qry_key_t));
+
+		/* clear the data as well */
+
+		fdb_transaction_clear_range(tr, (const uint8_t *) &ka, sizeof(tup_key_t),
+						(const uint8_t *) &kz, sizeof(tup_key_t));
+
         	f = fdb_transaction_commit(tr);
         	err = fdb_wait_error(f);
+		ERR_DONE(err, "pgcache_clear error: %s", fdb_get_error(err));
 
 done:
 		if (f) {
