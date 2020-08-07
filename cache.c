@@ -134,8 +134,6 @@ int32_t pgcache_retrieve(const qry_key_t *qk, int64_t ts, int *ntup, HeapTuple *
 	int kvcnt;
 	HeapTuple *tups = 0;
 
-	if (*ntup == 0) return 0;
-
 	ERR_DONE( fdb_database_create_transaction(get_fdb(), &tr), "cannot begin fdb transaction");
 	f = fdb_transaction_get(tr, (const uint8_t *) qk, sizeof(qry_key_t), 0); 
 	ERR_DONE( fdb_wait_error(f), "fdb future failed");
@@ -144,6 +142,10 @@ int32_t pgcache_retrieve(const qry_key_t *qk, int64_t ts, int *ntup, HeapTuple *
 	ERR_DONE( qv->status < 0, "qry race.");
 
 	*ntup = qv->status;
+	if (*ntup == 0) {
+		ret = 0;
+		goto done;
+	}
 	tups = (HeapTuple *) palloc0(*ntup * sizeof(HeapTuple));
 	*ptups = tups;
 	
