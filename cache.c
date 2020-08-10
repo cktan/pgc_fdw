@@ -313,7 +313,7 @@ int32_t pgcache_populate(const qry_key_t *qk, int64_t ts, int ntup, HeapTuple *t
 	qry_key_dump(qk, qkbuf);
 	/* elog(LOG, "Populating %d keys, for qk %s.", ntup, qkbuf); */
 
-	for (int i = 0; i < 10; i++) {
+	for (int j = 0; j < 10; j++) {
 		wszNb = 0;
 		wszEstNb = 0;
 
