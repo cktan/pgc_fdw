@@ -45,6 +45,7 @@ int32_t pgcache_get_status(const qry_key_t *qk, int64_t ts, int64_t *to, const c
 {
 	FDBTransaction *tr = 0;
 	FDBFuture *f = 0;
+	FDBFuture *f2 = 0;
 	fdb_error_t err;
 	int32_t ret = QRY_FAIL;
 
@@ -92,10 +93,36 @@ int32_t pgcache_get_status(const qry_key_t *qk, int64_t ts, int64_t *to, const c
 		} else {
 			fdb_future_destroy(f);
 			f = fdb_transaction_watch(tr, (const uint8_t *) qk, sizeof(qry_key_t)); 
-			fdb_wait_error(f);
+
+			f2 = fdb_transaction_commit(tr);
+
+			err = fdb_wait_error_timeout(f, 10);
+
+			//err = fdb_wait_error(f2);
+			if (err < 0) {
+				// pgc_fdw timed out
+				// already wait for 30 seconds. old transaction should be dead. we should take over 
+				elog(LOG, "fdb_transaction_watch last TX timed out. take over the TX and fetch.");
+				ret = QRY_FETCH;
+				*to = ts;
+				goto done;
+
+			} else if (err == 0) {
+			
+				elog(LOG, "fdb_transcation_watch succeeded");;
+			} else {
+				// watch error
+				elog(LOG, "fdb_transaction_watch error. %s", fdb_get_error(err));
+			}
+
 		}
 
 done:
+		if (f2) {
+			fdb_future_destroy(f2);
+			f2 = 0;
+		}
+
 		if (f) {
 			fdb_future_destroy(f);
 			f = 0;

@@ -15,6 +15,7 @@
 #include "funcapi.h"
 #include "miscadmin.h"
 
+#include <unistd.h>
 #include <stdint.h>
 #include <openssl/sha.h>
 
@@ -135,7 +136,22 @@ static inline fdb_error_t fdb_wait_error(FDBFuture *f) {
 	}
 }
 
+static inline fdb_error_t fdb_wait_error_timeout(FDBFuture *f, int timeout) {
+	int64_t ts = get_ts();
+	int64_t tz = ts + timeout*1000000;
 
+	while (ts < tz) {
+		if (fdb_future_is_ready(f)) {
+			return fdb_future_get_error(f);
+		} else  {
+			usleep(1000000);
+		}
+		ts = get_ts();
+	}
+	
+	return -1;
+}
+	
 void pgcache_init(void);
 void pgcache_fini(void);
 int32_t pgcache_get_status(const qry_key_t* qk, int64_t ts, int64_t *to, const char *data); 
